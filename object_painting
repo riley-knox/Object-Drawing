@@ -25,8 +25,8 @@ img_Width = int(1.5*live_cap.get(cv2.CAP_PROP_FRAME_WIDTH))          #columns
 
 #create blank canvas
 canvas = 255*np.ones((img_Height, img_Width, 3), dtype = np.uint8)
-canvas_in = np.copy(canvas)
-canvas_brush = np.copy(canvas)
+canvas_in = np.copy(canvas)                 #create canvas to be "painted"
+canvas_brush = np.copy(canvas)              #create canvas to show brush
 
 #run as a loop
 while True:
@@ -70,25 +70,24 @@ while True:
         continue
 
     #place brush spot on images at contour center
-    if cv2.contourArea(biggest_contour) >= 1000:
+    if cv2.contourArea(biggest_contour) >= 1000:                    #if ball present
         #find smallest circle enclosing biggest contour
         (x, y), radius = cv2.minEnclosingCircle(biggest_contour)    #smallest enclosing circle
-        centerX = int(x)
+        centerX = int(x)            #brush center
         centerY = int(y)
-        radius = int(radius)
-        #draw brush centerpoint on image
-        img_brush = cv2.circle(frame_in, (centerX, centerY), 3, (0, 0, 255), 2)
-        cv2.circle(canvas_brush, (centerX, centerY), 3, (0, 0, 255), 2)
-    elif cv2.contourArea(biggest_contour) < 1000:
-        img_brush = frame_in
-        canvas_brush = np.copy(canvas_in)
+        #radius = int(radius)        #brush radius
+        img_brush = cv2.circle(frame_in, (centerX, centerY), 3, (0, 0, 255), 2)         #draw brush on captured image
+        canvas_in = cv2.circle(canvas_in, (centerX, centerY), 2, (255, 0, 0), -1)        #paint on canvas
+        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY), 6, (0, 0, 255), 2)  #draw brush on canvas
+        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY), 2, (255, 0, 0), -1)     #paint on brush-canvas
+    elif cv2.contourArea(biggest_contour) < 1000:       #if ball not present
+        img_brush = frame_in                            #brush image is captured image
+        canvas_brush = np.copy(canvas_in)               #canvas does not show brush
 
-    cv2.imshow('brush spot', img_brush)
-    cv2.imshow('canvas', canvas_brush)
+    cv2.imshow('brush spot', img_brush)             #show video with brush
+    cv2.imshow('canvas', canvas_brush)              #show canvas with brush
 
-    canvas_brush = np.copy(canvas_in)
-
-
+    canvas_brush = np.copy(canvas_in)               #erase brush marker
 
 #end video capture and close windows
 live_cap.release()
