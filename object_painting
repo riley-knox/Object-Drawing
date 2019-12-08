@@ -6,6 +6,20 @@ import cv2
 import numpy as np
 #import time
 
+#set B value
+def set_B_value(value):
+    blue_val = value
+    cv2.setTrackbarPos('B', canvas_name, blue_val)
+
+def set_G_value(value):
+    green_val = value
+    cv2.setTrackbarPos('G', canvas_name, green_val)
+
+def set_R_value(value):
+    red_val = value
+    cv2.setTrackbarPos('R', canvas_name, red_val)
+
+
 #instructions
 print("Welcome to object painting!\n"
       "To exit, press 'q' while the video display window is selected.")
@@ -14,6 +28,15 @@ print("Welcome to object painting!\n"
 H_range = (20, 60)
 S_range = (40, 160)
 V_range = (100, 240)
+
+#window names
+canvas_name = 'canvas'
+cv2.namedWindow(canvas_name)
+
+#create trackbars to set ink color
+cv2.createTrackbar('B', canvas_name, 0, 255, set_B_value)
+cv2.createTrackbar('G', canvas_name, 0, 255, set_G_value)
+cv2.createTrackbar('R', canvas_name, 0, 255, set_R_value)
 
 #initialize video capture
 live_cap = cv2.VideoCapture(0)
@@ -85,7 +108,7 @@ while True:
         canvas_brush = np.copy(canvas_in)               #canvas does not show brush
 
     cv2.imshow('brush spot', img_brush)             #show video with brush
-    cv2.imshow('canvas', canvas_brush)              #show canvas with brush
+    cv2.imshow(canvas_name, canvas_brush)              #show canvas with brush
 
     canvas_brush = np.copy(canvas_in)               #erase brush marker
 
