@@ -25,6 +25,8 @@ img_Width = int(1.5*live_cap.get(cv2.CAP_PROP_FRAME_WIDTH))          #columns
 
 #create blank canvas
 canvas = 255*np.ones((img_Height, img_Width, 3), dtype = np.uint8)
+canvas_in = np.copy(canvas)
+canvas_brush = np.copy(canvas)
 
 #run as a loop
 while True:
@@ -76,13 +78,17 @@ while True:
         radius = int(radius)
         #draw brush centerpoint on image
         img_brush = cv2.circle(frame_in, (centerX, centerY), 3, (0, 0, 255), 2)
-        canvas_brush = cv2.circle(canvas, (centerX, centerY), 3, (0, 0, 255), 2)
+        cv2.circle(canvas_brush, (centerX, centerY), 3, (0, 0, 255), 2)
     elif cv2.contourArea(biggest_contour) < 1000:
         img_brush = frame_in
-        canvas_brush = canvas
+        canvas_brush = np.copy(canvas_in)
 
     cv2.imshow('brush spot', img_brush)
     cv2.imshow('canvas', canvas_brush)
+
+    canvas_brush = np.copy(canvas_in)
+
+
 
 #end video capture and close windows
 live_cap.release()
