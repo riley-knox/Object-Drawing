@@ -92,6 +92,11 @@ while True:
                                                     #HERE IF NO CONTOURS
         continue
 
+    #get ink color
+    B_val = cv2.getTrackbarPos('B', canvas_name)
+    G_val = cv2.getTrackbarPos('G', canvas_name)
+    R_val = cv2.getTrackbarPos('R', canvas_name)
+
     #place brush spot on images at contour center
     if cv2.contourArea(biggest_contour) >= 1000:                    #if ball present
         #find smallest circle enclosing biggest contour
@@ -100,9 +105,9 @@ while True:
         centerY = int(y)
         #radius = int(radius)        #brush radius
         img_brush = cv2.circle(frame_in, (centerX, centerY), 3, (0, 0, 255), 2)         #draw brush on captured image
-        canvas_in = cv2.circle(canvas_in, (centerX, centerY), 2, (255, 0, 0), -1)        #paint on canvas
+        canvas_in = cv2.circle(canvas_in, (centerX, centerY), 2, (B_val, G_val, R_val), -1)        #paint on canvas
         canvas_brush = cv2.circle(canvas_brush, (centerX, centerY), 6, (0, 0, 255), 2)  #draw brush on canvas
-        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY), 2, (255, 0, 0), -1)     #paint on brush-canvas
+        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY), 2, (B_val, G_val, R_val), -1)     #paint on brush-canvas
     elif cv2.contourArea(biggest_contour) < 1000:       #if ball not present
         img_brush = frame_in                            #brush image is captured image
         canvas_brush = np.copy(canvas_in)               #canvas does not show brush
