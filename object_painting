@@ -4,6 +4,7 @@
 from __future__ import print_function
 import numpy as np
 import cv2
+import math
 #import time
 
 #set B value
@@ -52,7 +53,6 @@ live_cap = cv2.VideoCapture(0)
 #window height & width
 img_Height = int(1.5*live_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))        #rows
 img_Width = int(1.5*live_cap.get(cv2.CAP_PROP_FRAME_WIDTH))          #columns
-#print(img_Height, img_Width)
 
 #create blank canvas
 canvas = 255*np.ones((img_Height, img_Width, 3), dtype=np.uint8)
@@ -102,16 +102,43 @@ while True:
     _, contours, _ = cv2.findContours(frame_dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     _, ROI_contours, _ = cv2.findContours(ROI_dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-    #identify biggest contours
-    #skin
-    if len(ROI_contours) == 0:
-        pass
-    elif len(ROI_contours) > 0:
-        ROI_big_cont = max(ROI_contours, key=cv2.contourArea)
-        hull = cv2.convexHull(ROI_big_cont)
-        #print(hull)
-        cv2.drawContours(ROI_hand, [hull], -1, (51, 255, 255))
-        cv2.imshow('convex hull', ROI_hand)
+    #determine number of fingers held up
+    num_gaps = 0
+    if len(ROI_contours) == 0:          #do nothing if no contours in ROI
+        num_fingers = 0
+    elif len(ROI_contours) > 0:         #if contours exist
+        ROI_big_cont = max(ROI_contours, key=cv2.contourArea)       #find biggest contour (hand)
+        convex_hull = cv2.convexHull(ROI_big_cont, returnPoints=False)  #find outline of contour
+        convex_defects = cv2.convexityDefects(ROI_big_cont, convex_hull)    #find convex defects in outline
+        if isinstance(convex_defects, np.ndarray):          #if defects exist
+            for i in range(convex_defects.shape[0]):        #for all defects
+                s, e, f, d = convex_defects[i, 0]           #get important defect points
+                start = tuple(ROI_big_cont[s][0])               #start
+                end = tuple(ROI_big_cont[e][0])                 #end
+                far = tuple(ROI_big_cont[f][0])                 #farthest point
+                a = math.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)  #side 1
+                b = math.sqrt((far[0] - start[0])**2 + (far[1] - start[1])**2)  #side 2
+                c = math.sqrt((end[0] - far[0])**2 + (end[1] - far[1])**2)      #side 3
+                angle = math.acos((b**2 + c**2 - a**2)/(2*b*c)) #find angle at defect using law of cosines
+                if angle <= math.pi/2:              #if angle less than 90 degrees
+                    num_gaps += 1                   #count defect as gap in fingers
+                    cv2.circle(ROI_hand, far, 5, (0, 0, 255), 2)
+
+        if num_gaps == 0:                   #if no gaps detected
+            num_fingers = 0                 #no fingers raised
+        elif num_gaps > 0:                  #if >0 gaps
+            num_fingers = num_gaps + 1      #extra finger raised
+        print(num_fingers)
+
+    #drawing conditions
+    if num_fingers == 0:                #do nothing if no fingers raised
+        state = 'hold'
+    elif num_fingers == 2:              #draw if two fingers raised
+        state = 'draw'
+    elif num_fingers == 5:              #erase if open hand
+        state = 'erase'
+    else:                               #do nothing if other gesture
+        state = 'hold'
 
     #tennis ball
     if len(contours) > 0:                                       #if contours exist
@@ -125,29 +152,36 @@ while True:
     G_val = cv2.getTrackbarPos('G', canvas_name)
     R_val = cv2.getTrackbarPos('R', canvas_name)
 
-    #place brush spot on images at contour center
-    if cv2.contourArea(biggest_contour) >= 4000:                    #if ball present
+    if cv2.contourArea(biggest_contour) >= 4000:                        #if ball present
         #find smallest circle enclosing biggest contour
-        (x, y), radius = cv2.minEnclosingCircle(biggest_contour)    #smallest enclosing circle
+        (x, y), radius = cv2.minEnclosingCircle(biggest_contour)        #smallest enclosing circle
         centerX = int(x)                #brush center
         centerY = int(y)
-        #radius = int(radius)        #brush radius
         img_brush = cv2.circle(img_brush, (centerX, centerY),
-                               3, (0, 0, 255), 2)                   #draw brush on captured image
-        canvas_in = cv2.circle(canvas_in, (centerX, centerY),
-                               2, (B_val, G_val, R_val), -1)        #paint on canvas
+                               3, (0, 0, 255), 2)                       #draw brush on captured image
         canvas_brush = cv2.circle(canvas_brush, (centerX, centerY),
-                                  6, (0, 0, 255), 2)                #draw brush on canvas
-        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY),
-                                  2, (B_val, G_val, R_val), -1)     #paint on brush-canvas
-    elif cv2.contourArea(biggest_contour) < 4000:                   #if ball not present
-        img_brush = img_brush                                       #brush image is captured image
-        canvas_brush = np.copy(canvas_in)                           #canvas does not show brush
+                                  6, (0, 0, 255), 2)                    #draw brush on canvas
+        if state == 'draw':                                             #if draw state
+            canvas_in = cv2.circle(canvas_in, (centerX, centerY),
+                                   2, (B_val, G_val, R_val), -1)        #paint on canvas
+            canvas_brush = cv2.circle(canvas_brush, (centerX, centerY),
+                                      2, (B_val, G_val, R_val), -1)     #paint on brush-canvas
+        elif state == 'erase':                                          #if erase state
+            canvas_in = cv2.circle(canvas_in, (centerX, centerY),
+                                   2, (255, 255, 255), -1)              #turn canvas white
+            canvas_brush = cv2.circle(canvas_brush, (centerX, centerY),
+                                      2, (0, 0, 0), -1)                 #turn brush-canvas white
+        elif state == 'hold':                                           #if hold state
+            pass
 
-    cv2.imshow('brush spot', img_brush)             #show video with brush
-    cv2.imshow(canvas_name, canvas_brush)              #show canvas with brush
+    elif cv2.contourArea(biggest_contour) < 4000:                       #if ball not present
+        img_brush = img_brush                                           #brush image is captured image
+        canvas_brush = np.copy(canvas_in)                               #canvas does not show brush
 
-    canvas_brush = np.copy(canvas_in)               #erase brush marker
+    cv2.imshow('brush spot', img_brush)                                 #show video with brush
+    cv2.imshow(canvas_name, canvas_brush)                               #show canvas with brush
+
+    canvas_brush = np.copy(canvas_in)                                   #erase brush marker
 
 #end video capture and close windows
 live_cap.release()
