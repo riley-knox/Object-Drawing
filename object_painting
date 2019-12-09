@@ -2,8 +2,8 @@
 
 #necessary imports
 from __future__ import print_function
-import cv2
 import numpy as np
+import cv2
 #import time
 
 #set B value
@@ -22,14 +22,22 @@ def set_R_value(value):
 
 #instructions
 print("Welcome to object painting!\n"
-      "To exit, press 'q' while the video display window is selected.")
+      "\n\nTo exit, press 'q' while the video display window is selected."
+      "\n\nThis program works best with a solid color background."
+      "\n\nKeep your hand inside the blue bounding box in the bottom left corner."
+      "\n\nYou can change ink color using the trackbars above the canvas.")
 
-#hsv colorspace ranges (currently tennis ball)
+#hsv colorspace ranges
+#tennis ball
 H_range = (20, 60)
 S_range = (40, 160)
 V_range = (100, 240)
+#skin
+H_skin = (1, 20)
+S_skin = (60, 170)
+V_skin = (120, 255)
 
-#window names
+#canvas window name
 canvas_name = 'canvas'
 cv2.namedWindow(canvas_name)
 
@@ -47,7 +55,7 @@ img_Width = int(1.5*live_cap.get(cv2.CAP_PROP_FRAME_WIDTH))          #columns
 #print(img_Height, img_Width)
 
 #create blank canvas
-canvas = 255*np.ones((img_Height, img_Width, 3), dtype = np.uint8)
+canvas = 255*np.ones((img_Height, img_Width, 3), dtype=np.uint8)
 canvas_in = np.copy(canvas)                 #create canvas to be "painted"
 canvas_brush = np.copy(canvas)              #create canvas to show brush
 
@@ -65,31 +73,51 @@ while True:
     new_dims = (img_Width, img_Height)
     frame_in = cv2.resize(frame_in, new_dims, cv2.INTER_AREA)
 
+    #bounding box for hand
+    ROI_hand = np.copy(frame_in[int(img_Height/2):int(img_Height), 0:300, :])
+
+    #place ROI rectangle on brush image
+    img_brush = cv2.rectangle(frame_in, (0, img_Height), (300, img_Height/2), (255, 0, 0), 2)
+
     #convert input from bgr to hsv
     frame_hsv = cv2.cvtColor(frame_in, cv2.COLOR_BGR2HSV)
+    ROI_hsv = cv2.cvtColor(ROI_hand, cv2.COLOR_BGR2HSV)
 
-    #color thresholding
+    #thresholding
     frame_threshold = cv2.inRange(frame_hsv, (H_range[0], S_range[0], V_range[0]),
                                   (H_range[1], S_range[1], V_range[1]))
+    ROI_threshold = cv2.inRange(ROI_hsv, (H_skin[0], S_skin[0], V_skin[0]), (H_skin[1], S_skin[1], V_skin[1]))
 
     #gaussian blur
     frame_blur = cv2.GaussianBlur(frame_threshold, (7, 7), 0)
-    #cv2.imshow('blurred', frame_blur)
+    ROI_blur = cv2.GaussianBlur(ROI_threshold, (7, 7), 0)
 
     #erosion/dilation to remove noise
     frame_erosion = cv2.erode(frame_blur, np.ones((7, 7)), iterations=2)
     frame_dilation = cv2.dilate(frame_erosion, np.ones((5, 5)), iterations=2)
+    ROI_erosion = cv2.erode(ROI_blur, np.ones((7, 7)), iterations=2)
+    ROI_dilation = cv2.dilate(ROI_erosion, np.ones((5, 5)), iterations=3)
 
     #find contours
     _, contours, _ = cv2.findContours(frame_dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    #print(contours)
+    _, ROI_contours, _ = cv2.findContours(ROI_dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-    #identify biggest contour
+    #identify biggest contours
+    #skin
+    if len(ROI_contours) == 0:
+        pass
+    elif len(ROI_contours) > 0:
+        ROI_big_cont = max(ROI_contours, key=cv2.contourArea)
+        hull = cv2.convexHull(ROI_big_cont)
+        #print(hull)
+        cv2.drawContours(ROI_hand, [hull], -1, (51, 255, 255))
+        cv2.imshow('convex hull', ROI_hand)
+
+    #tennis ball
     if len(contours) > 0:                                       #if contours exist
         biggest_contour = max(contours, key=cv2.contourArea)    #find biggest contour
     elif len(contours) == 0:                                    #if no contours
-        cv2.imshow('brush spot', frame_in)          #MAKE SURE 'PAINTED' IMAGE SHOWN
-                                                    #HERE IF NO CONTOURS
+        cv2.imshow('brush spot', img_brush)
         continue
 
     #get ink color
@@ -98,19 +126,23 @@ while True:
     R_val = cv2.getTrackbarPos('R', canvas_name)
 
     #place brush spot on images at contour center
-    if cv2.contourArea(biggest_contour) >= 1000:                    #if ball present
+    if cv2.contourArea(biggest_contour) >= 4000:                    #if ball present
         #find smallest circle enclosing biggest contour
         (x, y), radius = cv2.minEnclosingCircle(biggest_contour)    #smallest enclosing circle
-        centerX = int(x)            #brush center
+        centerX = int(x)                #brush center
         centerY = int(y)
         #radius = int(radius)        #brush radius
-        img_brush = cv2.circle(frame_in, (centerX, centerY), 3, (0, 0, 255), 2)         #draw brush on captured image
-        canvas_in = cv2.circle(canvas_in, (centerX, centerY), 2, (B_val, G_val, R_val), -1)        #paint on canvas
-        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY), 6, (0, 0, 255), 2)  #draw brush on canvas
-        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY), 2, (B_val, G_val, R_val), -1)     #paint on brush-canvas
-    elif cv2.contourArea(biggest_contour) < 1000:       #if ball not present
-        img_brush = frame_in                            #brush image is captured image
-        canvas_brush = np.copy(canvas_in)               #canvas does not show brush
+        img_brush = cv2.circle(img_brush, (centerX, centerY),
+                               3, (0, 0, 255), 2)                   #draw brush on captured image
+        canvas_in = cv2.circle(canvas_in, (centerX, centerY),
+                               2, (B_val, G_val, R_val), -1)        #paint on canvas
+        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY),
+                                  6, (0, 0, 255), 2)                #draw brush on canvas
+        canvas_brush = cv2.circle(canvas_brush, (centerX, centerY),
+                                  2, (B_val, G_val, R_val), -1)     #paint on brush-canvas
+    elif cv2.contourArea(biggest_contour) < 4000:                   #if ball not present
+        img_brush = img_brush                                       #brush image is captured image
+        canvas_brush = np.copy(canvas_in)                           #canvas does not show brush
 
     cv2.imshow('brush spot', img_brush)             #show video with brush
     cv2.imshow(canvas_name, canvas_brush)              #show canvas with brush
