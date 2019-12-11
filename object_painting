@@ -2,10 +2,9 @@
 
 #necessary imports
 from __future__ import print_function
+import math
 import numpy as np
 import cv2
-import math
-#import time
 
 #set B value
 def set_B_value(value):
@@ -22,13 +21,16 @@ def set_R_value(value):
 
 
 #instructions
-print("Welcome to object painting!\n"
+print("Welcome to object painting!"
       "\n\nTo exit, press 'q' while the video display window is selected."
       "\n\nThis program works best with a solid color background."
       "\n\nKeep your hand inside the blue bounding box in the bottom left corner."
-      "\n\nYou can change ink color using the trackbars above the canvas.")
+      "\n\nYou can change ink color using the trackbars above the canvas."
+      "\n\nTo draw, hold up two fingers. To erase, hold up an open hand. To move the brush "
+      "without interacting with the canvas, hold up a closed fist.")
 
 #hsv colorspace ranges
+#ranges found using script downloaded from: https://github.com/opencv/opencv/blob/3.4/samples/cpp/tutorial_code/ImgProc/Threshold_inRange.cpp
 #tennis ball
 H_range = (20, 60)
 S_range = (40, 160)
@@ -86,16 +88,17 @@ while True:
     #thresholding
     frame_threshold = cv2.inRange(frame_hsv, (H_range[0], S_range[0], V_range[0]),
                                   (H_range[1], S_range[1], V_range[1]))
-    ROI_threshold = cv2.inRange(ROI_hsv, (H_skin[0], S_skin[0], V_skin[0]), (H_skin[1], S_skin[1], V_skin[1]))
+    ROI_threshold = cv2.inRange(ROI_hsv, (H_skin[0], S_skin[0], V_skin[0]),
+                                (H_skin[1], S_skin[1], V_skin[1]))
 
     #gaussian blur
     frame_blur = cv2.GaussianBlur(frame_threshold, (7, 7), 0)
     ROI_blur = cv2.GaussianBlur(ROI_threshold, (7, 7), 0)
 
     #erosion/dilation to remove noise
-    frame_erosion = cv2.erode(frame_blur, np.ones((7, 7)), iterations=2)
+    frame_erosion = cv2.erode(frame_blur, np.ones((3, 3)), iterations=2)
     frame_dilation = cv2.dilate(frame_erosion, np.ones((5, 5)), iterations=2)
-    ROI_erosion = cv2.erode(ROI_blur, np.ones((7, 7)), iterations=2)
+    ROI_erosion = cv2.erode(ROI_blur, np.ones((3, 3)), iterations=2)
     ROI_dilation = cv2.dilate(ROI_erosion, np.ones((5, 5)), iterations=3)
 
     #find contours
@@ -128,7 +131,6 @@ while True:
             num_fingers = 0                 #no fingers raised
         elif num_gaps > 0:                  #if >0 gaps
             num_fingers = num_gaps + 1      #extra finger raised
-        print(num_fingers)
 
     #drawing conditions
     if num_fingers == 0:                #do nothing if no fingers raised
@@ -170,7 +172,7 @@ while True:
             canvas_in = cv2.circle(canvas_in, (centerX, centerY),
                                    2, (255, 255, 255), -1)              #turn canvas white
             canvas_brush = cv2.circle(canvas_brush, (centerX, centerY),
-                                      2, (0, 0, 0), -1)                 #turn brush-canvas white
+                                      2, (255, 255, 255), -1)                 #turn brush-canvas white
         elif state == 'hold':                                           #if hold state
             pass
 
